@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>财务比率分析</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --panel: #ffffff;
+    --ink: #1a1a18;
+    --muted: #6b6b66;
+    --line: #e2e2dd;
+    --accent: #3b6ea5;
+    --warn-bg: #fdf3f2;
+    --warn-ink: #a33b32;
+    --warn-line: #f0d5d2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
+  header { margin-bottom: 28px; }
+  h1 { font-size: 22px; margin: 0 0 4px; font-weight: 600; }
+  .sub { color: var(--muted); font-size: 13px; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .tab {
+    padding: 9px 16px; border: none; background: none; cursor: pointer;
+    font: inherit; color: var(--muted); border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 20px; margin-bottom: 20px;
+  }
+  .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 18px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  select, input {
+    font: inherit; padding: 7px 10px; border: 1px solid var(--line);
+    border-radius: 6px; background: #fff; color: var(--ink); min-width: 130px;
+  }
+  select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button.go {
+    font: inherit; padding: 8px 18px; border: none; border-radius: 6px;
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+  button.go:hover { background: #325e8c; }
+  button.link {
+    font: inherit; font-size: 12px; border: none; background: none;
+    color: var(--muted); cursor: pointer; padding: 2px 6px;
+  }
+  button.link:hover { color: var(--warn-ink); }
+
+  .chart-box { position: relative; height: 340px; }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .scroll-x { overflow-x: auto; }
+  .flag { color: var(--warn-ink); font-weight: 600; }
+
+  .warnings { margin-top: 16px; }
+  .warn {
+    background: var(--warn-bg); border: 1px solid var(--warn-line);
+    color: var(--warn-ink); border-radius: 6px; padding: 9px 12px;
+    margin-bottom: 6px; font-size: 13px;
+  }
+  .warn b { font-weight: 600; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .empty { color: var(--muted); padding: 30px 0; text-align: center; }
+  h2 { font-size: 15px; margin: 0 0 14px; font-weight: 600; }
+  h3 { font-size: 13px; margin: 20px 0 10px; font-weight: 600; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>财务比率分析</h1>
+  <div class="sub">输入财报关键数据，计算八个核心比率，看趋势与横向对比</div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-view="trend">单公司趋势</button>
+  <button class="tab" data-view="compare">多公司对比</button>
+  <button class="tab" data-view="entry">录入数据</button>
+</div>
+
+<!-- ============ 趋势 ============ -->
+<section id="view-trend">
+  <div class="panel">
+    <div class="controls">
+      <div>
+        <label for="trend-company">公司</label>
+        <select id="trend-company"></select>
+      </div>
+      <div>
+        <label for="trend-ratio">比率</label>
+        <select id="trend-ratio"></select>
+      </div>
+    </div>
+    <div class="chart-box"><canvas id="trend-chart"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <h2>全部比率</h2>
+    <div class="scroll-x"><table id="trend-table"></table></div>
+    <div id="trend-warnings" class="warnings"></div>
+  </div>
+</section>
+
+<!-- ============ 对比 ============ -->
+<section id="view-compare" hidden>
+  <div class="panel">
+    <div class="controls">
+      <div>
+        <label for="compare-year">财年</label>
+        <select id="compare-year"></select>
+      </div>
+      <div>
+        <label for="compare-ratio">比率</label>
+        <select id="compare-ratio"></select>
+      </div>
+    </div>
+    <div class="chart-box"><canvas id="compare-chart"></canvas></div>
+    <div class="note">
+      注意：各公司财年结束日期不同（苹果 9 月、微软 6 月、沃尔玛 1 月），
+      同一个财年覆盖的时间段并不完全重合。
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>当年全部比率</h2>
+    <div class="scroll-x"><table id="compare-table"></table></div>
+  </div>
+</section>
+
+<!-- ============ 录入 ============ -->
+<section id="view-entry" hidden>
+  <div class="panel">
+    <h2>新增公司</h2>
+    <div class="controls">
+      <div><label>公司名 *</label><input id="new-name" placeholder="Tesla"></div>
+      <div><label>股票代码</label><input id="new-ticker" placeholder="TSLA"></div>
+      <div><label>行业</label><input id="new-industry" placeholder="汽车"></div>
+      <button class="go" id="add-company">添加</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>录入一年财报</h2>
+    <div class="controls">
+      <div>
+        <label for="entry-company">公司</label>
+        <select id="entry-company"></select>
+      </div>
+      <div><label>财年 *</label><input id="entry-year" type="number" placeholder="2024"></div>
+    </div>
+
+    <h3>利润表</h3>
+    <div class="grid" id="grid-income"></div>
+    <h3>资产负债表</h3>
+    <div class="grid" id="grid-balance"></div>
+
+    <div style="margin-top:18px">
+      <button class="go" id="add-statement">保存这一年</button>
+      <span class="note" style="margin-left:10px">单位随意，只要同一家公司前后一致即可（比率是相除，单位会约掉）</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>已有数据</h2>
+    <div class="scroll-x"><table id="entry-table"></table></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+const API = "/api";
+const COLORS = ["#3b6ea5", "#c9743a", "#5a8a5c", "#8a5a8a", "#a3903b"];
+
+// 后端 schemas.StatementCreate 里的字段，分两组显示
+const INCOME_FIELDS = [
+  ["revenue", "营收"],
+  ["cost_of_goods_sold", "销货成本"],
+  ["operating_income", "营业利润"],
+  ["net_income", "净利润"],
+];
+const BALANCE_FIELDS = [
+  ["total_assets", "总资产"],
+  ["total_liabilities", "总负债"],
+  ["total_equity", "股东权益"],
+  ["current_assets", "流动资产"],
+  ["current_liabilities", "流动负债"],
+  ["inventory", "存货"],
+];
+
+let labels = {};      // 比率名 -> {label, format}，从后端取
+let companies = [];
+let trendChart = null;
+let compareChart = null;
+
+// ---------- 工具 ----------
+
+async function api(path, options) {
+  const res = await fetch(API + path, options);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail || detail; } catch (e) {}
+    throw new Error(detail);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+function fmt(key, value) {
+  if (value === null || value === undefined) return "—";
+  return labels[key]?.format === "percent"
+    ? (value * 100).toFixed(1) + "%"
+    : value.toFixed(2) + "×";
+}
+
+function fillSelect(el, items, { value, text, selected }) {
+  el.innerHTML = "";
+  for (const item of items) {
+    const opt = document.createElement("option");
+    opt.value = value(item);
+    opt.textContent = text(item);
+    el.appendChild(opt);
+  }
+  if (selected !== undefined && selected !== null) el.value = selected;
+}
+
+function drawChart(canvasId, existing, config) {
+  if (existing) existing.destroy();   // Chart.js 不销毁旧图就会在同一个 canvas 上叠加
+  return new Chart(document.getElementById(canvasId), config);
+}
+
+function axisConfig(ratioKey) {
+  const isPercent = labels[ratioKey]?.format === "percent";
+  return {
+    beginAtZero: true,
+    ticks: {
+      callback: v => isPercent ? (v * 100).toFixed(0) + "%" : v.toFixed(1) + "×",
+    },
+    grid: { color: "#ececE6" },
+  };
+}
+
+// ---------- 趋势 ----------
+
+async function renderTrend() {
+  const companyId = document.getElementById("trend-company").value;
+  const ratioKey = document.getElementById("trend-ratio").value;
+  if (!companyId) return;
+
+  const data = await api(`/companies/${companyId}/ratios`);
+  const years = data.years;
+
+  if (!years.length) {
+    document.getElementById("trend-table").innerHTML =
+      '<tr><td class="empty">这家公司还没有数据，去「录入数据」加几年</td></tr>';
+    document.getElementById("trend-warnings").innerHTML = "";
+    if (trendChart) { trendChart.destroy(); trendChart = null; }
+    return;
+  }
+
+  trendChart = drawChart("trend-chart", trendChart, {
+    type: "line",
+    data: {
+      labels: years.map(y => y.fiscal_year),
+      datasets: [{
+        label: labels[ratioKey].label,
+        data: years.map(y => y.ratios[ratioKey]),
+        borderColor: COLORS[0],
+        backgroundColor: COLORS[0] + "22",
+        borderWidth: 2,
+        pointRadius: 4,
+        tension: 0.25,
+        fill: true,
+        spanGaps: true,     // 某年算不出来（null）时把线连过去，而不是断开
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: `${data.company.name} · ${labels[ratioKey].label}` },
+        tooltip: { callbacks: { label: c => fmt(ratioKey, c.parsed.y) } },
+      },
+      scales: { y: axisConfig(ratioKey) },
+    },
+  });
+
+  // 表格：行是比率，列是年份
+  const keys = Object.keys(labels);
+  let html = "<thead><tr><th>比率</th>" +
+    years.map(y => `<th>${y.fiscal_year}</th>`).join("") + "</tr></thead><tbody>";
+  for (const key of keys) {
+    const flagged = new Set(
+      years.map((y, i) => y.warnings.some(w => w.ratio === key) ? i : -1)
+    );
+    html += `<tr><td>${labels[key].label}</td>` +
+      years.map((y, i) =>
+        `<td class="${flagged.has(i) ? "flag" : ""}">${fmt(key, y.ratios[key])}</td>`
+      ).join("") + "</tr>";
+  }
+  document.getElementById("trend-table").innerHTML = html + "</tbody>";
+
+  // 告警：只显示最近一年的，避免刷屏
+  const latest = years[years.length - 1];
+  document.getElementById("trend-warnings").innerHTML = latest.warnings.length
+    ? `<h3>${latest.fiscal_year} 年提示</h3>` + latest.warnings.map(w =>
+        `<div class="warn"><b>${labels[w.ratio].label} ${fmt(w.ratio, w.value)}</b> — ${w.message}</div>`
+      ).join("")
+    : "";
+}
+
+// ---------- 对比 ----------
+
+async function renderCompare() {
+  const year = document.getElementById("compare-year").value;
+  const ratioKey = document.getElementById("compare-ratio").value;
+  if (!year) return;
+
+  const rows = await api(`/compare?fiscal_year=${year}`);
+
+  if (!rows.length) {
+    document.getElementById("compare-table").innerHTML =
+      '<tr><td class="empty">这一年没有数据</td></tr>';
+    if (compareChart) { compareChart.destroy(); compareChart = null; }
+    return;
+  }
+
+  compareChart = drawChart("compare-chart", compareChart, {
+    type: "bar",
+    data: {
+      labels: rows.map(r => r.company.name),
+      datasets: [{
+        label: labels[ratioKey].label,
+        data: rows.map(r => r.ratios[ratioKey]),
+        backgroundColor: rows.map((_, i) => COLORS[i % COLORS.length]),
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: `${year} 财年 · ${labels[ratioKey].label}` },
+        tooltip: { callbacks: { label: c => fmt(ratioKey, c.parsed.y) } },
+      },
+      scales: { y: axisConfig(ratioKey) },
+    },
+  });
+
+  const keys = Object.keys(labels);
+  let html = "<thead><tr><th>公司</th><th>行业</th>" +
+    keys.map(k => `<th>${labels[k].label}</th>`).join("") + "</tr></thead><tbody>";
+  for (const row of rows) {
+    const flagged = new Set(row.warnings.map(w => w.ratio));
+    html += `<tr><td>${row.company.name}</td><td>${row.company.industry || "—"}</td>` +
+      keys.map(k =>
+        `<td class="${flagged.has(k) ? "flag" : ""}">${fmt(k, row.ratios[k])}</td>`
+      ).join("") + "</tr>";
+  }
+  document.getElementById("compare-table").innerHTML = html + "</tbody>";
+}
+
+// ---------- 录入 ----------
+
+function buildEntryForm() {
+  const cell = ([key, label]) =>
+    `<div><label>${label}</label><input data-field="${key}" type="number" step="any"></div>`;
+  document.getElementById("grid-income").innerHTML = INCOME_FIELDS.map(cell).join("");
+  document.getElementById("grid-balance").innerHTML = BALANCE_FIELDS.map(cell).join("");
+}
+
+async function renderEntryTable() {
+  const companyId = document.getElementById("entry-company").value;
+  const table = document.getElementById("entry-table");
+  if (!companyId) { table.innerHTML = ""; return; }
+
+  const statements = await api(`/companies/${companyId}/statements`);
+  if (!statements.length) {
+    table.innerHTML = '<tr><td class="empty">还没有数据</td></tr>';
+    return;
+  }
+
+  const all = [...INCOME_FIELDS, ...BALANCE_FIELDS];
+  table.innerHTML =
+    "<thead><tr><th>财年</th>" + all.map(f => `<th>${f[1]}</th>`).join("") +
+    "<th></th></tr></thead><tbody>" +
+    statements.map(s =>
+      `<tr><td>${s.fiscal_year}</td>` +
+      all.map(f => `<td>${s[f[0]] ?? "—"}</td>`).join("") +
+      `<td><button class="link" data-delete="${s.id}">删除</button></td></tr>`
+    ).join("") + "</tbody>";
+
+  table.querySelectorAll("[data-delete]").forEach(btn => {
+    btn.onclick = async () => {
+      await api(`/statements/${btn.dataset.delete}`, { method: "DELETE" });
+      await refreshYears();
+      renderEntryTable();
+    };
+  });
+}
+
+async function addCompany() {
+  const name = document.getElementById("new-name").value.trim();
+  if (!name) { alert("公司名必填"); return; }
+  try {
+    await api("/companies", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        ticker: document.getElementById("new-ticker").value.trim() || null,
+        industry: document.getElementById("new-industry").value.trim() || null,
+      }),
+    });
+    ["new-name", "new-ticker", "new-industry"].forEach(
+      id => document.getElementById(id).value = ""
+    );
+    await loadCompanies();
+    alert(`已添加 ${name}`);
+  } catch (e) { alert("失败：" + e.message); }
+}
+
+async function addStatement() {
+  const companyId = document.getElementById("entry-company").value;
+  const year = document.getElementById("entry-year").value;
+  if (!companyId) { alert("先添加一家公司"); return; }
+  if (!year) { alert("财年必填"); return; }
+
+  const payload = { fiscal_year: Number(year) };
+  document.querySelectorAll("[data-field]").forEach(input => {
+    // 空输入框存 null（代表"没这个数"），不是 0
+    payload[input.dataset.field] = input.value === "" ? null : Number(input.value);
+  });
+
+  try {
+    await api(`/companies/${companyId}/statements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    document.getElementById("entry-year").value = "";
+    document.querySelectorAll("[data-field]").forEach(i => i.value = "");
+    await refreshYears();
+    renderEntryTable();
+    alert(`${year} 年已保存`);
+  } catch (e) { alert("失败：" + e.message); }
+}
+
+// ---------- 初始化 ----------
+
+async function loadCompanies() {
+  companies = await api("/companies");
+  for (const id of ["trend-company", "entry-company"]) {
+    const el = document.getElementById(id);
+    const keep = el.value;
+    fillSelect(el, companies, {
+      value: c => c.id,
+      text: c => c.ticker ? `${c.name} (${c.ticker})` : c.name,
+      selected: keep || undefined,
+    });
+  }
+  renderEntryTable();
+}
+
+async function refreshYears() {
+  const years = await api("/years");
+  const el = document.getElementById("compare-year");
+  const keep = el.value;
+  fillSelect(el, years, { value: y => y, text: y => `${y} 财年`, selected: keep || undefined });
+}
+
+function switchView(name) {
+  document.querySelectorAll(".tab").forEach(t =>
+    t.classList.toggle("active", t.dataset.view === name)
+  );
+  for (const v of ["trend", "compare", "entry"]) {
+    document.getElementById("view-" + v).hidden = v !== name;
+  }
+  if (name === "trend") renderTrend();
+  if (name === "compare") renderCompare();
+}
+
+async function init() {
+  labels = await api("/ratio-labels");
+
+  const ratioOptions = {
+    value: k => k,
+    text: k => labels[k].label,
+  };
+  fillSelect(document.getElementById("trend-ratio"), Object.keys(labels), ratioOptions);
+  fillSelect(document.getElementById("compare-ratio"), Object.keys(labels), ratioOptions);
+  document.getElementById("trend-ratio").value = "roe";
+  document.getElementById("compare-ratio").value = "gross_margin";
+
+  buildEntryForm();
+  await loadCompanies();
+  await refreshYears();
+
+  document.querySelectorAll(".tab").forEach(t =>
+    t.onclick = () => switchView(t.dataset.view)
+  );
+  document.getElementById("trend-company").onchange = renderTrend;
+  document.getElementById("trend-ratio").onchange = renderTrend;
+  document.getElementById("compare-year").onchange = renderCompare;
+  document.getElementById("compare-ratio").onchange = renderCompare;
+  document.getElementById("entry-company").onchange = renderEntryTable;
+  document.getElementById("add-company").onclick = addCompany;
+  document.getElementById("add-statement").onclick = addStatement;
+
+  renderTrend();
+}
+
+init().catch(e => {
+  document.querySelector(".wrap").innerHTML =
+    `<div class="panel"><b>加载失败：</b>${e.message}<br>
+     <span class="note">后端没起来？运行 backend/.venv/bin/uvicorn app.main:app --reload</span></div>`;
+});
+</script>
+</body>
+</html>
