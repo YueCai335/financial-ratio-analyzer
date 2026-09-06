@@ -1,82 +1,78 @@
-# 财务比率分析器 Financial Ratio Analyzer
+# Financial Ratio Analyzer
 
-输入几家公司的财报关键数据，自动计算八个核心财务比率，用图表展示多年趋势和跨公司对比。
+Enter the key figures from a company's annual report and get eight core financial ratios, plotted as multi-year trends and side-by-side comparisons across companies.
 
-## 跑起来
+FastAPI + SQLite backend, single-file Chart.js frontend. Built to practise the full loop — data in, calculation, presentation — on a domain I already know from the CFA Program.
+
+*[中文说明见 README.zh.md](README.zh.md)*
+
+## Running it
 
 ```bash
 cd backend
-.venv/bin/python seed.py                          # 灌入示例数据（会清空重建）
-.venv/bin/python -m uvicorn app.main:app --reload  # 启动
+.venv/bin/python seed.py                           # load sample data (drops and rebuilds)
+.venv/bin/python -m uvicorn app.main:app --reload  # start
 ```
 
-打开 http://127.0.0.1:8000 —— 前端由后端一起托管，不用另外起服务。
-API 文档在 http://127.0.0.1:8000/docs （FastAPI 自动生成的）。
+Open http://127.0.0.1:8000 — the backend serves the frontend, so there is no second server to start.
+Auto-generated API docs are at http://127.0.0.1:8000/docs.
 
-跑测试：
+Tests:
 
 ```bash
 cd backend && .venv/bin/python -m pytest test_ratios.py -v
 ```
 
-## 八个比率
+## The eight ratios
 
-| 比率 | 公式 | 看什么 |
-|------|------|--------|
-| 毛利率 | (营收 − 销货成本) / 营收 | 定价权和成本结构 |
-| 净利率 | 净利润 / 营收 | 最终落袋的比例 |
-| ROE | 净利润 / 股东权益 | 股东资本的回报率 |
-| ROA | 净利润 / 总资产 | 不看杠杆的资产效率 |
-| 流动比率 | 流动资产 / 流动负债 | 短期偿债能力 |
-| 速动比率 | (流动资产 − 存货) / 流动负债 | 剔除最难变现的存货后的短期偿债能力 |
-| 资产负债率 | 总负债 / 总资产 | 家当里借来的比例 |
-| 权益乘数 | 总资产 / 股东权益 | 杠杆倍数 |
+| Ratio | Formula | What it tells you |
+|---|---|---|
+| Gross margin | (revenue − COGS) / revenue | Pricing power and cost structure |
+| Net margin | net income / revenue | What actually reaches the bottom line |
+| ROE | net income / total equity | Return on shareholders' capital |
+| ROA | net income / total assets | Asset efficiency, ignoring leverage |
+| Current ratio | current assets / current liabilities | Short-term solvency |
+| Quick ratio | (current assets − inventory) / current liabilities | Short-term solvency once the least liquid asset is removed |
+| Debt-to-assets | total liabilities / total assets | How much of the business is financed by debt |
+| Equity multiplier | total assets / total equity | Leverage |
 
-两个恒等式在测试里做了断言，写错公式会被抓出来：
+Two accounting identities are asserted in the test suite, so a mistyped formula fails the build rather than quietly returning a plausible number:
 
-- `ROE = ROA × 权益乘数`（杜邦分析）
-- `权益乘数 = 1 / (1 − 资产负债率)`
+- `ROE = ROA × equity multiplier` (DuPont)
+- `equity multiplier = 1 / (1 − debt-to-assets)`
 
-## 结构
+## Layout
 
 ```
 backend/
   app/
-    database.py   SQLite 连接、Session、Base
-    models.py     两张表：Company / FinancialStatement
-    schemas.py    Pydantic：API 的输入输出格式
-    ratios.py     八个比率的纯函数（不依赖数据库）
-    health.py     健康度阈值规则（写死的、可解释的）
-    main.py       FastAPI 路由 + 托管前端
-  seed.py         示例数据
-  test_ratios.py  比率计算的测试
+    database.py   SQLite connection, Session, Base
+    models.py     two tables: Company / FinancialStatement
+    schemas.py    Pydantic request and response shapes
+    ratios.py     the eight ratios as pure functions (no database import)
+    health.py     rule-based health thresholds (hard-coded and explainable)
+    main.py       FastAPI routes, also serves the frontend
+  seed.py         sample data
+  test_ratios.py  tests for the calculations
 frontend/
-  index.html      单文件前端，Chart.js 画图
+  index.html      single-file frontend, charts via Chart.js
 ```
 
-## 几个技术选型
+## Design decisions
 
-**为什么用 SQLite 而不是 PostgreSQL。** 单文件、不需要 Docker、不需要单独起数据库服务。
-这个项目的数据量（几十条记录）和并发（单人使用）完全用不上 PG 的能力。
-代价是并发写入弱、没有严格的类型检查 —— 都不影响这个场景。
+**Why SQLite instead of PostgreSQL.** One file, no Docker, no separate database service to run. This project holds a few dozen rows and has exactly one user, so none of PostgreSQL's strengths apply. The cost is weak concurrent writes and looser type checking — neither matters here.
 
-**为什么金额用 Float 而不是 Numeric。** Float 有浮点误差（`0.1 + 0.2 != 0.3`），
-记账系统绝不能用。但这里只拿它算比率、画图，误差在小数点后十几位，不影响任何结论。
-知道有坑，判断这个场景里坑不致命。
+**Why amounts are Float, not Numeric.** Floats carry rounding error (`0.1 + 0.2 != 0.3`), which disqualifies them for anything that books money. Here they are only divided into ratios and drawn on charts, so the error lands somewhere past the twelfth decimal place and changes no conclusion. The point is knowing the trap exists and judging that it is harmless in this context.
 
-**为什么 ratios.py 不 import 数据库。** 进去是普通数字，出来是普通数字。
-这样可以脱离数据库单独测试（`test_ratios.py` 跑一遍只要 0.02 秒），
-以后换数据库也不用改计算逻辑。翻译工作集中在 `main.py` 的 `_to_fields()` 一个函数里。
+**Why `ratios.py` never imports the database.** Plain numbers in, plain numbers out. The calculation layer can therefore be tested without a database (the suite runs in about 0.02s) and would survive swapping the storage engine. All translation between ORM objects and plain dictionaries happens in one function, `_to_fields()` in `main.py`.
 
-**为什么算不出来时返回 None 而不是 0。** "算不出来" 和 "等于 0" 是两件不同的事。
-股东权益为 0 时 ROE 是无意义的，不是 0。返回 None、前端显示 "—"，不会误导人。
+**Why an undefined ratio returns None, not 0.** "Cannot be computed" and "equals zero" are different facts. A company with zero equity has no ROE — it does not have an ROE of 0. Returning None, and rendering it as "—", avoids stating something false.
 
-## 已知局限
+**Why the health check is rules, not a model.** Every warning traces back to a specific number crossing a specific documented threshold, so it can be explained and argued with. A model here would be less useful and less honest.
 
-- **健康度阈值不分行业。** 流动比率 < 1 对零售业是常态（占用供应商账期就是它的商业模式），
-  对制造业才是警号。严谨做法是跟同行业中位数比，不在 MVP 范围内。
-- **财年口径不一致。** 苹果财年 9 月底结束、微软 6 月底、沃尔玛 1 月底，
-  同一个 `fiscal_year` 覆盖的经济周期并不重合，横向对比时要留意。
-- **示例数据尚未逐项复核。** `seed.py` 里的数字取自各公司 10-K，
-  但没有逐条对过，仅用于演示计算和图表，不要当作分析依据。
-- **没有做的**：实时股价 API、任何预测或投资建议、用户登录系统 —— 都是刻意排除的。
+## Known limitations
+
+- **Health thresholds ignore industry.** A current ratio below 1 is normal in retail — stretching supplier terms *is* the business model — and a warning sign in manufacturing. The rigorous version compares against an industry median, which is out of scope for this MVP.
+- **Fiscal years are not aligned.** Apple's fiscal year ends in September, Microsoft's in June, Walmart's in January. The same `fiscal_year` value does not cover the same economic period, which matters when comparing across companies.
+- **Sample data has not been line-by-line verified.** The figures in `seed.py` were taken from each company's 10-K but not individually reconciled. They exist to demonstrate the calculations and charts, not to support analysis.
+- **Deliberately excluded:** live price APIs, any forecasting or investment advice, and user accounts.
