@@ -1,11 +1,12 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-# SQLite 单文件数据库，文件会生成在 backend/ 目录下
+# Single-file SQLite database; the file is created under backend/
 SQLALCHEMY_DATABASE_URL = "sqlite:///./financials.db"
 
-# check_same_thread=False 是 SQLite + FastAPI 的固定要求：
-# FastAPI 的请求可能跑在不同线程里，SQLite 默认禁止跨线程复用连接
+# check_same_thread=False is required for SQLite + FastAPI:
+# FastAPI requests may run on different threads, and SQLite disallows
+# reusing a connection across threads by default.
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},

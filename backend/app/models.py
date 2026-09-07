@@ -5,23 +5,24 @@ from .database import Base
 
 
 class Company(Base):
-    # 这张表在数据库里叫什么名字
+    # The table name in the database
     __tablename__ = "companies"
 
-    # Mapped[int] = 这一列存整数
-    # primary_key=True = 这是行号，自动 1,2,3... 递增，不用你填
+    # Mapped[int] = stores an integer
+    # primary_key=True = row number, auto-increments 1,2,3..., never set manually
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    # Mapped[str] = 存文字，不带 | None 就是必填（数据库层面 NOT NULL）
-    # String(100) = 最长 100 个字符
+    # Mapped[str] = stores text, no "| None" means required (NOT NULL at the DB level)
+    # String(100) = max length 100 characters
     name: Mapped[str] = mapped_column(String(100))
 
-    # Mapped[str | None] = 存文字，可以为空。"| None" 就是"允许没有"的意思
+    # Mapped[str | None] = stores text, may be empty. "| None" means "allowed to be missing"
     ticker: Mapped[str | None] = mapped_column(String(10))
     industry: Mapped[str | None] = mapped_column(String(50))
 
-    # 这一行不是数据库里的列，是给 Python 用的快捷方式：
-    # 拿到一个 company 对象后，company.statements 直接就是它名下所有年份的财报
+    # Not a real database column — a Python-side convenience:
+    # once you have a company object, company.statements is a list of all its
+    # yearly financial statements
     statements: Mapped[list["FinancialStatement"]] = relationship(
         back_populates="company",
         cascade="all, delete-orphan",
@@ -33,21 +34,23 @@ class FinancialStatement(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    # 外键：这条财报属于哪家公司。存的是 companies 表里的 id
+    # Foreign key: which company this statement belongs to.
+    # Stores an id from the companies table.
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"))
 
     fiscal_year: Mapped[int] = mapped_column()
 
-    # ---- 利润表 ----
-    # Float = 存小数。金额用 Float 有浮点误差（0.1+0.2 != 0.3），
-    # 记账系统绝不能用，但这里只拿它算比率、画图，误差在小数点后十几位，
-    # 不影响任何结论。取舍见 README。
+    # ---- Income statement ----
+    # Float = stores decimals. Floats have rounding error (0.1 + 0.2 != 0.3),
+    # which is unacceptable in a real accounting ledger. Here they only feed
+    # ratio math and charts, where the error is many decimal places out and
+    # never changes a conclusion. Trade-off discussed in the README.
     revenue: Mapped[float | None] = mapped_column(Float)
     cost_of_goods_sold: Mapped[float | None] = mapped_column(Float)
     operating_income: Mapped[float | None] = mapped_column(Float)
     net_income: Mapped[float | None] = mapped_column(Float)
 
-    # ---- 资产负债表 ----
+    # ---- Balance sheet ----
     total_assets: Mapped[float | None] = mapped_column(Float)
     total_liabilities: Mapped[float | None] = mapped_column(Float)
     total_equity: Mapped[float | None] = mapped_column(Float)
@@ -55,14 +58,17 @@ class FinancialStatement(Base):
     current_liabilities: Mapped[float | None] = mapped_column(Float)
     inventory: Mapped[float | None] = mapped_column(Float)
 
-    # 金额字段全部允许为空：从年报上抄数字时可能某项一时找不到，
-    # 先存进去，别的比率照样能算。算不出来的显示 "—"，比整条录不进去好。
+    # All amount fields are nullable: when transcribing numbers from a filing,
+    # a particular line item may be temporarily unavailable — store what you
+    # have and the other ratios still compute. A ratio that can't be computed
+    # shows "—" instead of blocking the whole row from being saved.
 
-    # 反向的快捷方式：statement.company 直接拿到所属公司对象
+    # Reverse convenience: statement.company gives the owning company object
     company: Mapped["Company"] = relationship(back_populates="statements")
 
-    # 同一家公司同一个财年只能有一条记录 —— 在数据库层面强制，
-    # 这样就算代码写错了重复插入，数据库自己会拦下来
+    # A given company can only have one record per fiscal year — enforced at
+    # the database level, so a bug that inserts a duplicate gets rejected
+    # automatically instead of silently corrupting the data.
     __table_args__ = (
         UniqueConstraint("company_id", "fiscal_year", name="uq_company_year"),
     )

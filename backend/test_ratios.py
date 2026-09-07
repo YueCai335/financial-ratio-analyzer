@@ -1,17 +1,19 @@
-"""比率计算的测试。
+"""Tests for the ratio calculations.
 
-用一组好心算的数字，手算结果写死在这里，跟函数输出对比。
-这是整个项目里最该有测试的地方：比率算错了，图画得再漂亮也是错的，
-而且错得很隐蔽 —— 图表照样能画出一条平滑的线。
+A set of numbers chosen to be easy to check by hand, with the expected
+results hard-coded here and compared against the function output. This is
+the most important place in the project to have tests: a wrong ratio
+formula produces a chart that still looks fine — a smooth, plausible line —
+so the bug hides well without a test to catch it.
 
-跑：backend/.venv/bin/python -m pytest test_ratios.py -v
+Run: backend/.venv/bin/python -m pytest test_ratios.py -v
 """
 
 import pytest
 
 from app import health, ratios
 
-# 一组刻意挑的整数，所有比率都能心算验证
+# A set of round numbers chosen so every ratio can be verified by mental math
 SAMPLE = {
     "revenue": 1000.0,
     "cost_of_goods_sold": 600.0,
@@ -67,9 +69,10 @@ def test_equity_multiplier():
 
 
 def test_dupont_identity():
-    """ROE = ROA × 权益乘数。这是恒等式，不成立说明某个公式写错了。
+    """ROE = ROA x equity multiplier. This is an identity — if it doesn't
+    hold, some formula is wrong.
 
-    0.05 × 2.5 = 0.125 ✓
+    0.05 x 2.5 = 0.125 (checks out)
     """
     roe = ratios.roe(SAMPLE["net_income"], SAMPLE["total_equity"])
     roa = ratios.roa(SAMPLE["net_income"], SAMPLE["total_assets"])
@@ -78,56 +81,62 @@ def test_dupont_identity():
 
 
 def test_leverage_identity():
-    """权益乘数 = 1 / (1 - 资产负债率)。同样是恒等式。"""
+    """Equity multiplier = 1 / (1 - debt-to-assets). Also an identity."""
     dta = ratios.debt_to_assets(SAMPLE["total_liabilities"], SAMPLE["total_assets"])
     em = ratios.equity_multiplier(SAMPLE["total_assets"], SAMPLE["total_equity"])
     assert em == pytest.approx(1 / (1 - dta), rel=1e-6)
 
 
-# ---------- 边界情况：这些才是真正容易出 bug 的地方 ----------
+# ---------- Edge cases: where real bugs actually hide ----------
 
 
 def test_zero_denominator_returns_none():
-    """分母为 0 时返回 None，不能崩，也不能返回 0。"""
+    """A zero denominator returns None — must not crash, and must not
+    return 0.
+    """
     assert ratios.roe(100, 0) is None
     assert ratios.current_ratio(500, 0) is None
     assert ratios.gross_margin(0, 0) is None
 
 
 def test_missing_data_returns_none():
-    """缺数据时返回 None，代表'算不出来'。"""
+    """Missing data returns None, meaning 'cannot be computed'."""
     assert ratios.net_margin(None, 100) is None
     assert ratios.net_margin(1000, None) is None
     assert ratios.quick_ratio(500, None, 250) is None
 
 
 def test_negative_equity():
-    """股东权益为负（资不抵债）时 ROE 会是负数 —— 这在数学上算得出来，
-    但解读时要小心：负 ROE 配负权益，数值上可能显示成"正的"，是陷阱。
-    这里确认函数不会静默出错。
+    """Negative equity (insolvency) produces a negative ROE — mathematically
+    fine, but a trap when reading the number: a negative ROE paired with
+    negative equity can look "positive" at a glance. This test just confirms
+    the function doesn't fail silently.
     """
     assert ratios.roe(100, -500) == -0.2
 
 
 def test_calculate_all_handles_empty_dict():
-    """完全没数据时，八个比率全是 None，不能抛异常。"""
+    """With no data at all, all eight ratios are None — must not raise."""
     result = ratios.calculate_all({})
     assert len(result) == 8
     assert all(v is None for v in result.values())
 
 
 def test_calculate_all_matches_labels():
-    """calculate_all 返回的 key 必须和 RATIO_LABELS 完全对上，
-    否则前端会显示不出名字。加个字段忘了加标签，这个测试会抓到。
+    """The keys returned by calculate_all must exactly match RATIO_LABELS,
+    or the frontend won't have a name to display. This test catches a field
+    added without a matching label.
     """
     assert set(ratios.calculate_all(SAMPLE)) == set(ratios.RATIO_LABELS)
 
 
-# ---------- 健康度规则 ----------
+# ---------- Health check rules ----------
 
 
 def test_healthy_company_has_no_warnings():
-    """样本数据流动比率 2.0、资产负债率 0.6，都在阈值内。"""
+    """Sample data has a current ratio of 2.0 and debt-to-assets of 0.6,
+    both within the thresholds.
+    """
     assert health.check(ratios.calculate_all(SAMPLE)) == []
 
 

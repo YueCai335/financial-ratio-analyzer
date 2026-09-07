@@ -1,21 +1,25 @@
-"""八个核心财务比率的计算。
+"""Calculation of the eight core financial ratios.
 
-这个文件不 import 任何数据库相关的东西 —— 进去是普通数字，出来是普通数字。
-好处：可以脱离数据库单独测试，换掉数据库也不用改这里。
+This file imports nothing database-related — plain numbers go in, plain
+numbers come out. Benefit: it can be tested in isolation from the database,
+and swapping the database later requires no changes here.
 """
 
-# 每个比率算出来后要几位小数。比率本身是无量纲的小数（0.4622 = 46.22%），
-# 在这一层只做四舍五入，不乘 100、不加百分号 —— 那是展示层的事。
+# Decimal places to round each ratio to. Ratios are dimensionless fractions
+# (0.4622 = 46.22%); rounding happens at this layer only — multiplying by 100
+# or adding a "%" sign is the presentation layer's job.
 PRECISION = 4
 
 
 def _divide(numerator: float | None, denominator: float | None) -> float | None:
-    """安全除法：任何一边缺数据、或者分母为 0，都返回 None。
+    """Safe division: returns None if either side is missing, or the
+    denominator is 0.
 
-    为什么返回 None 而不是 0：
-    "算不出来" 和 "算出来等于 0" 是两件完全不同的事。
-    一家公司股东权益为 0（资不抵债的边缘）时 ROE 是无意义的，不是 0。
-    返回 None，前端显示 "—"，不会误导人。
+    Why None instead of 0:
+    "cannot be computed" and "computes to zero" are two different things.
+    When a company's equity is 0 (on the edge of insolvency), ROE is
+    meaningless, not zero. Returning None lets the frontend show "—" instead
+    of a misleading number.
     """
     if numerator is None or denominator is None:
         return None
@@ -24,92 +28,113 @@ def _divide(numerator: float | None, denominator: float | None) -> float | None:
     return round(numerator / denominator, PRECISION)
 
 
-# ---------- 盈利能力 ----------
+# ---------- Profitability ----------
 
 
 def gross_margin(revenue, cost_of_goods_sold):
-    """毛利率 = (营收 - 销货成本) / 营收。每 1 块钱收入里，扣掉直接成本后剩多少。"""
+    """Gross margin = (revenue - cost of goods sold) / revenue.
+    How much of each dollar of revenue is left after direct costs.
+    """
     if revenue is None or cost_of_goods_sold is None:
         return None
     return _divide(revenue - cost_of_goods_sold, revenue)
 
 
 def net_margin(revenue, net_income):
-    """净利率 = 净利润 / 营收。每 1 块钱收入最后落到股东口袋里多少。"""
+    """Net margin = net income / revenue.
+    How much of each dollar of revenue ultimately reaches shareholders.
+    """
     return _divide(net_income, revenue)
 
 
 def roe(net_income, total_equity):
-    """ROE = 净利润 / 股东权益。股东每投入 1 块钱，一年赚回多少。"""
+    """ROE = net income / total equity.
+    Return earned per dollar shareholders have invested.
+    """
     return _divide(net_income, total_equity)
 
 
 def roa(net_income, total_assets):
-    """ROA = 净利润 / 总资产。全部资产（不分借的还是自己的）每 1 块钱赚多少。
+    """ROA = net income / total assets.
+    Return earned per dollar of assets, regardless of how they were financed.
 
-    ROE 和 ROA 的差距来自杠杆：ROE = ROA × 权益乘数。
-    ROE 高但 ROA 平平，说明利润是借钱撬出来的，不是经营效率高。
+    The gap between ROE and ROA comes from leverage: ROE = ROA x equity
+    multiplier. A high ROE with a flat ROA means the return is driven by
+    borrowed money, not operating efficiency.
     """
     return _divide(net_income, total_assets)
 
 
-# ---------- 流动性 ----------
+# ---------- Liquidity ----------
 
 
 def current_ratio(current_assets, current_liabilities):
-    """流动比率 = 流动资产 / 流动负债。一年内要还的钱，有多少一年内能变现的资产顶着。"""
+    """Current ratio = current assets / current liabilities.
+    How much liquidatable-within-a-year asset backs each dollar of debt due
+    within a year.
+    """
     return _divide(current_assets, current_liabilities)
 
 
 def quick_ratio(current_assets, inventory, current_liabilities):
-    """速动比率 = (流动资产 - 存货) / 流动负债。
+    """Quick ratio = (current assets - inventory) / current liabilities.
 
-    为什么要减掉存货：存货是流动资产里最难快速变现的一项 ——
-    急着还债时打折甩卖，未必卖得掉，卖掉也未必值账面价。
-    减掉它才是"真能马上拿出来的钱"。零售业存货占比大，这两个比率会差很远。
+    Why inventory is subtracted: inventory is the hardest current asset to
+    convert to cash quickly — a fire sale to cover debt may not clear it at
+    book value, or at all. Removing it leaves "cash you can truly raise
+    right now." Retailers carry heavy inventory, so this ratio and the
+    current ratio can diverge sharply for them.
     """
     if current_assets is None or inventory is None:
         return None
     return _divide(current_assets - inventory, current_liabilities)
 
 
-# ---------- 杠杆 / 偿债能力 ----------
+# ---------- Leverage / solvency ----------
 
 
 def debt_to_assets(total_liabilities, total_assets):
-    """资产负债率 = 总负债 / 总资产。公司的家当里有多大比例是借来的。"""
+    """Debt-to-assets = total liabilities / total assets.
+    What fraction of the company's assets are funded by debt.
+    """
     return _divide(total_liabilities, total_assets)
 
 
 def equity_multiplier(total_assets, total_equity):
-    """权益乘数 = 总资产 / 股东权益。股东每 1 块钱撑起了多少资产，就是杠杆倍数。
+    """Equity multiplier = total assets / total equity.
+    How many dollars of assets each dollar of equity supports — the leverage
+    multiple.
 
-    和资产负债率是同一件事的两种说法：权益乘数 = 1 / (1 - 资产负债率)。
-    杜邦分析里用的是这个形式：ROE = 净利率 × 资产周转率 × 权益乘数。
+    Equivalent to debt-to-assets from another angle:
+    equity multiplier = 1 / (1 - debt-to-assets). This is the form used in
+    DuPont analysis: ROE = net margin x asset turnover x equity multiplier.
     """
     return _divide(total_assets, total_equity)
 
 
-# ---------- 一次算全部 ----------
+# ---------- Compute everything at once ----------
 
-# 展示用的中文名和格式，前端和这里共用一份，避免两边对不上
+# Display labels and formats, shared between backend and frontend so they
+# never fall out of sync.
 RATIO_LABELS = {
-    "gross_margin": ("毛利率", "percent"),
-    "net_margin": ("净利率", "percent"),
+    "gross_margin": ("Gross Margin", "percent"),
+    "net_margin": ("Net Margin", "percent"),
     "roe": ("ROE", "percent"),
     "roa": ("ROA", "percent"),
-    "current_ratio": ("流动比率", "times"),
-    "quick_ratio": ("速动比率", "times"),
-    "debt_to_assets": ("资产负债率", "percent"),
-    "equity_multiplier": ("权益乘数", "times"),
+    "current_ratio": ("Current Ratio", "times"),
+    "quick_ratio": ("Quick Ratio", "times"),
+    "debt_to_assets": ("Debt to Assets", "percent"),
+    "equity_multiplier": ("Equity Multiplier", "times"),
 }
 
 
 def calculate_all(f: dict) -> dict:
-    """输入一年的财务数据（普通 dict），返回八个比率（普通 dict）。
+    """Takes one year of financial data (a plain dict) and returns the eight
+    ratios (a plain dict).
 
-    参数用 dict 而不是数据库对象，是为了让这个函数不依赖 SQLAlchemy。
-    缺字段时 f.get() 返回 None，上面每个函数都能安全处理，不会崩。
+    The parameter is a dict rather than a database object so this function
+    stays independent of SQLAlchemy. f.get() returns None for missing
+    fields, which every function above already handles safely.
     """
     return {
         "gross_margin": gross_margin(f.get("revenue"), f.get("cost_of_goods_sold")),

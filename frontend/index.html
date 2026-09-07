@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>财务比率分析</title>
+<title>Financial Ratio Analyzer</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
@@ -22,8 +22,8 @@
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC",
-          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
   }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
   header { margin-bottom: 28px; }
@@ -89,26 +89,26 @@
 <div class="wrap">
 
 <header>
-  <h1>财务比率分析</h1>
-  <div class="sub">输入财报关键数据，计算八个核心比率，看趋势与横向对比</div>
+  <h1>Financial Ratio Analyzer</h1>
+  <div class="sub">Enter key financial statement data, compute eight core ratios, and view trends and comparisons</div>
 </header>
 
 <div class="tabs">
-  <button class="tab active" data-view="trend">单公司趋势</button>
-  <button class="tab" data-view="compare">多公司对比</button>
-  <button class="tab" data-view="entry">录入数据</button>
+  <button class="tab active" data-view="trend">Company Trend</button>
+  <button class="tab" data-view="compare">Compare Companies</button>
+  <button class="tab" data-view="entry">Enter Data</button>
 </div>
 
-<!-- ============ 趋势 ============ -->
+<!-- ============ Trend ============ -->
 <section id="view-trend">
   <div class="panel">
     <div class="controls">
       <div>
-        <label for="trend-company">公司</label>
+        <label for="trend-company">Company</label>
         <select id="trend-company"></select>
       </div>
       <div>
-        <label for="trend-ratio">比率</label>
+        <label for="trend-ratio">Ratio</label>
         <select id="trend-ratio"></select>
       </div>
     </div>
@@ -116,73 +116,74 @@
   </div>
 
   <div class="panel">
-    <h2>全部比率</h2>
+    <h2>All Ratios</h2>
     <div class="scroll-x"><table id="trend-table"></table></div>
     <div id="trend-warnings" class="warnings"></div>
   </div>
 </section>
 
-<!-- ============ 对比 ============ -->
+<!-- ============ Compare ============ -->
 <section id="view-compare" hidden>
   <div class="panel">
     <div class="controls">
       <div>
-        <label for="compare-year">财年</label>
+        <label for="compare-year">Fiscal Year</label>
         <select id="compare-year"></select>
       </div>
       <div>
-        <label for="compare-ratio">比率</label>
+        <label for="compare-ratio">Ratio</label>
         <select id="compare-ratio"></select>
       </div>
     </div>
     <div class="chart-box"><canvas id="compare-chart"></canvas></div>
     <div class="note">
-      注意：各公司财年结束日期不同（苹果 9 月、微软 6 月、沃尔玛 1 月），
-      同一个财年覆盖的时间段并不完全重合。
+      Note: fiscal year-end dates differ by company (Apple: September,
+      Microsoft: June, Walmart: January), so the same fiscal year doesn't
+      cover exactly the same period across companies.
     </div>
   </div>
 
   <div class="panel">
-    <h2>当年全部比率</h2>
+    <h2>All Ratios for This Year</h2>
     <div class="scroll-x"><table id="compare-table"></table></div>
   </div>
 </section>
 
-<!-- ============ 录入 ============ -->
+<!-- ============ Entry ============ -->
 <section id="view-entry" hidden>
   <div class="panel">
-    <h2>新增公司</h2>
+    <h2>Add Company</h2>
     <div class="controls">
-      <div><label>公司名 *</label><input id="new-name" placeholder="Tesla"></div>
-      <div><label>股票代码</label><input id="new-ticker" placeholder="TSLA"></div>
-      <div><label>行业</label><input id="new-industry" placeholder="汽车"></div>
-      <button class="go" id="add-company">添加</button>
+      <div><label>Name *</label><input id="new-name" placeholder="Tesla"></div>
+      <div><label>Ticker</label><input id="new-ticker" placeholder="TSLA"></div>
+      <div><label>Industry</label><input id="new-industry" placeholder="Automotive"></div>
+      <button class="go" id="add-company">Add</button>
     </div>
   </div>
 
   <div class="panel">
-    <h2>录入一年财报</h2>
+    <h2>Enter One Year of Data</h2>
     <div class="controls">
       <div>
-        <label for="entry-company">公司</label>
+        <label for="entry-company">Company</label>
         <select id="entry-company"></select>
       </div>
-      <div><label>财年 *</label><input id="entry-year" type="number" placeholder="2024"></div>
+      <div><label>Fiscal Year *</label><input id="entry-year" type="number" placeholder="2024"></div>
     </div>
 
-    <h3>利润表</h3>
+    <h3>Income Statement</h3>
     <div class="grid" id="grid-income"></div>
-    <h3>资产负债表</h3>
+    <h3>Balance Sheet</h3>
     <div class="grid" id="grid-balance"></div>
 
     <div style="margin-top:18px">
-      <button class="go" id="add-statement">保存这一年</button>
-      <span class="note" style="margin-left:10px">单位随意，只要同一家公司前后一致即可（比率是相除，单位会约掉）</span>
+      <button class="go" id="add-statement">Save This Year</button>
+      <span class="note" style="margin-left:10px">Units are up to you, as long as they're consistent within a company (ratios are computed as a division, so units cancel out)</span>
     </div>
   </div>
 
   <div class="panel">
-    <h2>已有数据</h2>
+    <h2>Existing Data</h2>
     <div class="scroll-x"><table id="entry-table"></table></div>
   </div>
 </section>
@@ -193,28 +194,28 @@
 const API = "/api";
 const COLORS = ["#3b6ea5", "#c9743a", "#5a8a5c", "#8a5a8a", "#a3903b"];
 
-// 后端 schemas.StatementCreate 里的字段，分两组显示
+// Fields from the backend's schemas.StatementCreate, shown as two groups
 const INCOME_FIELDS = [
-  ["revenue", "营收"],
-  ["cost_of_goods_sold", "销货成本"],
-  ["operating_income", "营业利润"],
-  ["net_income", "净利润"],
+  ["revenue", "Revenue"],
+  ["cost_of_goods_sold", "Cost of Goods Sold"],
+  ["operating_income", "Operating Income"],
+  ["net_income", "Net Income"],
 ];
 const BALANCE_FIELDS = [
-  ["total_assets", "总资产"],
-  ["total_liabilities", "总负债"],
-  ["total_equity", "股东权益"],
-  ["current_assets", "流动资产"],
-  ["current_liabilities", "流动负债"],
-  ["inventory", "存货"],
+  ["total_assets", "Total Assets"],
+  ["total_liabilities", "Total Liabilities"],
+  ["total_equity", "Total Equity"],
+  ["current_assets", "Current Assets"],
+  ["current_liabilities", "Current Liabilities"],
+  ["inventory", "Inventory"],
 ];
 
-let labels = {};      // 比率名 -> {label, format}，从后端取
+let labels = {};      // ratio key -> {label, format}, fetched from the backend
 let companies = [];
 let trendChart = null;
 let compareChart = null;
 
-// ---------- 工具 ----------
+// ---------- Utilities ----------
 
 async function api(path, options) {
   const res = await fetch(API + path, options);
@@ -245,7 +246,7 @@ function fillSelect(el, items, { value, text, selected }) {
 }
 
 function drawChart(canvasId, existing, config) {
-  if (existing) existing.destroy();   // Chart.js 不销毁旧图就会在同一个 canvas 上叠加
+  if (existing) existing.destroy();   // Chart.js would stack a new chart on the old one on the same canvas otherwise
   return new Chart(document.getElementById(canvasId), config);
 }
 
@@ -260,7 +261,7 @@ function axisConfig(ratioKey) {
   };
 }
 
-// ---------- 趋势 ----------
+// ---------- Trend ----------
 
 async function renderTrend() {
   const companyId = document.getElementById("trend-company").value;
@@ -272,7 +273,7 @@ async function renderTrend() {
 
   if (!years.length) {
     document.getElementById("trend-table").innerHTML =
-      '<tr><td class="empty">这家公司还没有数据，去「录入数据」加几年</td></tr>';
+      '<tr><td class="empty">No data yet for this company — add some years in "Enter Data"</td></tr>';
     document.getElementById("trend-warnings").innerHTML = "";
     if (trendChart) { trendChart.destroy(); trendChart = null; }
     return;
@@ -291,7 +292,7 @@ async function renderTrend() {
         pointRadius: 4,
         tension: 0.25,
         fill: true,
-        spanGaps: true,     // 某年算不出来（null）时把线连过去，而不是断开
+        spanGaps: true,     // bridge the line across a year that couldn't be computed (null) instead of breaking it
       }],
     },
     options: {
@@ -305,9 +306,9 @@ async function renderTrend() {
     },
   });
 
-  // 表格：行是比率，列是年份
+  // Table: rows are ratios, columns are years
   const keys = Object.keys(labels);
-  let html = "<thead><tr><th>比率</th>" +
+  let html = "<thead><tr><th>Ratio</th>" +
     years.map(y => `<th>${y.fiscal_year}</th>`).join("") + "</tr></thead><tbody>";
   for (const key of keys) {
     const flagged = new Set(
@@ -320,16 +321,16 @@ async function renderTrend() {
   }
   document.getElementById("trend-table").innerHTML = html + "</tbody>";
 
-  // 告警：只显示最近一年的，避免刷屏
+  // Warnings: only show the most recent year, to avoid clutter
   const latest = years[years.length - 1];
   document.getElementById("trend-warnings").innerHTML = latest.warnings.length
-    ? `<h3>${latest.fiscal_year} 年提示</h3>` + latest.warnings.map(w =>
+    ? `<h3>${latest.fiscal_year} Warnings</h3>` + latest.warnings.map(w =>
         `<div class="warn"><b>${labels[w.ratio].label} ${fmt(w.ratio, w.value)}</b> — ${w.message}</div>`
       ).join("")
     : "";
 }
 
-// ---------- 对比 ----------
+// ---------- Compare ----------
 
 async function renderCompare() {
   const year = document.getElementById("compare-year").value;
@@ -340,7 +341,7 @@ async function renderCompare() {
 
   if (!rows.length) {
     document.getElementById("compare-table").innerHTML =
-      '<tr><td class="empty">这一年没有数据</td></tr>';
+      '<tr><td class="empty">No data for this year</td></tr>';
     if (compareChart) { compareChart.destroy(); compareChart = null; }
     return;
   }
@@ -360,7 +361,7 @@ async function renderCompare() {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        title: { display: true, text: `${year} 财年 · ${labels[ratioKey].label}` },
+        title: { display: true, text: `FY${year} · ${labels[ratioKey].label}` },
         tooltip: { callbacks: { label: c => fmt(ratioKey, c.parsed.y) } },
       },
       scales: { y: axisConfig(ratioKey) },
@@ -368,7 +369,7 @@ async function renderCompare() {
   });
 
   const keys = Object.keys(labels);
-  let html = "<thead><tr><th>公司</th><th>行业</th>" +
+  let html = "<thead><tr><th>Company</th><th>Industry</th>" +
     keys.map(k => `<th>${labels[k].label}</th>`).join("") + "</tr></thead><tbody>";
   for (const row of rows) {
     const flagged = new Set(row.warnings.map(w => w.ratio));
@@ -380,7 +381,7 @@ async function renderCompare() {
   document.getElementById("compare-table").innerHTML = html + "</tbody>";
 }
 
-// ---------- 录入 ----------
+// ---------- Entry ----------
 
 function buildEntryForm() {
   const cell = ([key, label]) =>
@@ -396,18 +397,18 @@ async function renderEntryTable() {
 
   const statements = await api(`/companies/${companyId}/statements`);
   if (!statements.length) {
-    table.innerHTML = '<tr><td class="empty">还没有数据</td></tr>';
+    table.innerHTML = '<tr><td class="empty">No data yet</td></tr>';
     return;
   }
 
   const all = [...INCOME_FIELDS, ...BALANCE_FIELDS];
   table.innerHTML =
-    "<thead><tr><th>财年</th>" + all.map(f => `<th>${f[1]}</th>`).join("") +
+    "<thead><tr><th>Fiscal Year</th>" + all.map(f => `<th>${f[1]}</th>`).join("") +
     "<th></th></tr></thead><tbody>" +
     statements.map(s =>
       `<tr><td>${s.fiscal_year}</td>` +
       all.map(f => `<td>${s[f[0]] ?? "—"}</td>`).join("") +
-      `<td><button class="link" data-delete="${s.id}">删除</button></td></tr>`
+      `<td><button class="link" data-delete="${s.id}">Delete</button></td></tr>`
     ).join("") + "</tbody>";
 
   table.querySelectorAll("[data-delete]").forEach(btn => {
@@ -421,7 +422,7 @@ async function renderEntryTable() {
 
 async function addCompany() {
   const name = document.getElementById("new-name").value.trim();
-  if (!name) { alert("公司名必填"); return; }
+  if (!name) { alert("Name is required"); return; }
   try {
     await api("/companies", {
       method: "POST",
@@ -436,19 +437,19 @@ async function addCompany() {
       id => document.getElementById(id).value = ""
     );
     await loadCompanies();
-    alert(`已添加 ${name}`);
-  } catch (e) { alert("失败：" + e.message); }
+    alert(`Added ${name}`);
+  } catch (e) { alert("Failed: " + e.message); }
 }
 
 async function addStatement() {
   const companyId = document.getElementById("entry-company").value;
   const year = document.getElementById("entry-year").value;
-  if (!companyId) { alert("先添加一家公司"); return; }
-  if (!year) { alert("财年必填"); return; }
+  if (!companyId) { alert("Add a company first"); return; }
+  if (!year) { alert("Fiscal year is required"); return; }
 
   const payload = { fiscal_year: Number(year) };
   document.querySelectorAll("[data-field]").forEach(input => {
-    // 空输入框存 null（代表"没这个数"），不是 0
+    // An empty input stores null ("no data for this field"), not 0
     payload[input.dataset.field] = input.value === "" ? null : Number(input.value);
   });
 
@@ -462,11 +463,11 @@ async function addStatement() {
     document.querySelectorAll("[data-field]").forEach(i => i.value = "");
     await refreshYears();
     renderEntryTable();
-    alert(`${year} 年已保存`);
-  } catch (e) { alert("失败：" + e.message); }
+    alert(`Saved fiscal year ${year}`);
+  } catch (e) { alert("Failed: " + e.message); }
 }
 
-// ---------- 初始化 ----------
+// ---------- Initialization ----------
 
 async function loadCompanies() {
   companies = await api("/companies");
@@ -486,7 +487,7 @@ async function refreshYears() {
   const years = await api("/years");
   const el = document.getElementById("compare-year");
   const keep = el.value;
-  fillSelect(el, years, { value: y => y, text: y => `${y} 财年`, selected: keep || undefined });
+  fillSelect(el, years, { value: y => y, text: y => `FY${y}`, selected: keep || undefined });
 }
 
 function switchView(name) {
@@ -532,8 +533,8 @@ async function init() {
 
 init().catch(e => {
   document.querySelector(".wrap").innerHTML =
-    `<div class="panel"><b>加载失败：</b>${e.message}<br>
-     <span class="note">后端没起来？运行 backend/.venv/bin/uvicorn app.main:app --reload</span></div>`;
+    `<div class="panel"><b>Failed to load:</b> ${e.message}<br>
+     <span class="note">Is the backend running? Start it with backend/.venv/bin/uvicorn app.main:app --reload</span></div>`;
 });
 </script>
 </body>

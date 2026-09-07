@@ -10,17 +10,22 @@ from sqlalchemy.orm import Session
 from . import health, models, ratios, schemas
 from .database import Base, engine, get_db
 
-# 开发阶段直接按 models.py 建表。生产项目会用 Alembic 做迁移，
-# 但这个项目表结构一旦定下来就不怎么改，先不引入那层复杂度。
+# Create tables directly from models.py during development. A production
+# project would use Alembic migrations, but this project's schema rarely
+# changes once set, so that extra layer isn't introduced here.
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Financial Ratio Analyzer",
-    description="输入财报关键数据，计算八个核心财务比率，展示趋势与横向对比",
+    description="Enter key financial statement data, compute eight core "
+    "financial ratios, and view trends and cross-company comparisons.",
 )
 
-# 前端如果单独部署在 Vercel，域名和后端不同，浏览器会拦跨域请求，所以要开 CORS。
-# 本项目前端由同一个服务托管，其实用不到，但留着方便以后拆开部署。
+# If the frontend were deployed separately (e.g. on Vercel), its domain
+# would differ from the backend's and the browser would block cross-origin
+# requests, hence CORS. This project serves the frontend from the same
+# service, so it isn't strictly needed, but it's kept in case of a future
+# split deployment.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,7 +33,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# models.py 里所有金额字段的名字，用来从数据库对象里挑出要送进计算函数的数据
+# Names of every monetary field in models.py, used to pick out the data to
+# feed into the calculation functions from a database object
 FINANCIAL_FIELDS = [
     "revenue",
     "cost_of_goods_sold",
@@ -44,10 +50,11 @@ FINANCIAL_FIELDS = [
 
 
 def _to_fields(statement: models.FinancialStatement) -> dict:
-    """把数据库对象转成普通 dict，好喂给 ratios.calculate_all。
+    """Converts a database object into a plain dict to feed into
+    ratios.calculate_all.
 
-    这一步就是 ratios.py 不依赖 SQLAlchemy 的代价，也是它的价值所在：
-    翻译工作集中在这一个函数里。
+    This is the price of ratios.py not depending on SQLAlchemy, and also its
+    payoff: the translation work is confined to this one function.
     """
     return {name: getattr(statement, name) for name in FINANCIAL_FIELDS}
 
@@ -64,7 +71,7 @@ def _year_result(statement: models.FinancialStatement) -> dict:
 def _get_company(db: Session, company_id: int) -> models.Company:
     company = db.get(models.Company, company_id)
     if company is None:
-        raise HTTPException(status_code=404, detail="公司不存在")
+        raise HTTPException(status_code=404, detail="Company not found")
     return company
 
 
@@ -75,9 +82,11 @@ def healthcheck():
 
 @app.get("/api/ratio-labels")
 def ratio_labels():
-    """告诉前端每个比率叫什么中文名、该按百分比还是倍数显示。
+    """Tells the frontend the display name and format (percent/times) for
+    each ratio.
 
-    放在后端是为了只维护一份，前端改文案不用两边同步。
+    Kept on the backend so there is only one copy to maintain — the
+    frontend's wording never needs to be kept in sync separately.
     """
     return {
         key: {"label": label, "format": fmt}
@@ -85,7 +94,7 @@ def ratio_labels():
     }
 
 
-# ---------- 公司 ----------
+# ---------- Companies ----------
 
 
 @app.get("/api/companies", response_model=list[schemas.CompanyOut])
@@ -105,13 +114,13 @@ def create_company(payload: schemas.CompanyCreate, db: Session = Depends(get_db)
 @app.delete("/api/companies/{company_id}", status_code=204)
 def delete_company(company_id: int, db: Session = Depends(get_db)):
     company = _get_company(db, company_id)
-    # models.py 里 relationship 配了 cascade="all, delete-orphan"，
-    # 删公司时它名下的财报会一起删掉，不会留下无主的孤儿记录
+    # models.py configures the relationship with cascade="all, delete-orphan",
+    # so deleting a company also deletes its statements — no orphan records left behind
     db.delete(company)
     db.commit()
 
 
-# ---------- 财报数据 ----------
+# ---------- Financial statement data ----------
 
 
 @app.get(
@@ -143,12 +152,14 @@ def create_statement(
     try:
         db.commit()
     except IntegrityError:
-        # 撞上了 models.py 里的 UniqueConstraint：这家公司这一年已经录过了。
-        # 必须 rollback，否则这个 session 后面所有操作都会失败。
+        # Hit the UniqueConstraint in models.py: this company already has a
+        # record for this year. Must roll back, or every later operation on
+        # this session will fail.
         db.rollback()
         raise HTTPException(
             status_code=409,
-            detail=f"{payload.fiscal_year} 年的数据已存在，请先删除再重录",
+            detail=f"Data for fiscal year {payload.fiscal_year} already "
+            f"exists; delete it before re-entering",
         )
     db.refresh(statement)
     return statement
@@ -158,17 +169,19 @@ def create_statement(
 def delete_statement(statement_id: int, db: Session = Depends(get_db)):
     statement = db.get(models.FinancialStatement, statement_id)
     if statement is None:
-        raise HTTPException(status_code=404, detail="记录不存在")
+        raise HTTPException(status_code=404, detail="Record not found")
     db.delete(statement)
     db.commit()
 
 
-# ---------- 比率 ----------
+# ---------- Ratios ----------
 
 
 @app.get("/api/companies/{company_id}/ratios", response_model=schemas.CompanyRatios)
 def company_ratios(company_id: int, db: Session = Depends(get_db)):
-    """一家公司所有年份的比率，按年份升序，前端拿到直接画折线图。"""
+    """All years of ratios for one company, ascending by year, ready for the
+    frontend to plot as a line chart.
+    """
     company = _get_company(db, company_id)
     statements = db.scalars(
         select(models.FinancialStatement)
@@ -183,10 +196,14 @@ def company_ratios(company_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/compare", response_model=list[schemas.ComparisonRow])
 def compare(fiscal_year: int, db: Session = Depends(get_db)):
-    """同一个财年，所有有数据的公司各算一遍，用来画并排柱状图。
+    """Computes ratios for every company that has data in a given fiscal
+    year, for a side-by-side bar chart.
 
-    注意一个真实世界的坑：各家财年结束日期不同（苹果 9 月、微软 6 月、沃尔玛 1 月），
-    所谓"同一个 fiscal_year"其实覆盖的经济周期不完全一样，严格比较时要留意。
+    A real-world wrinkle worth noting: companies' fiscal years end on
+    different dates (Apple in September, Microsoft in June, Walmart in
+    January), so the "same fiscal_year" doesn't cover exactly the same
+    economic period across companies — worth keeping in mind for strict
+    comparisons.
     """
     rows = db.execute(
         select(models.Company, models.FinancialStatement)
@@ -201,7 +218,9 @@ def compare(fiscal_year: int, db: Session = Depends(get_db)):
 
 @app.get("/api/years")
 def available_years(db: Session = Depends(get_db)):
-    """数据库里有哪些年份有数据，给前端的年份下拉框用。"""
+    """Which fiscal years have data in the database, for the frontend's year
+    dropdown.
+    """
     years = db.scalars(
         select(models.FinancialStatement.fiscal_year)
         .distinct()
@@ -210,10 +229,12 @@ def available_years(db: Session = Depends(get_db)):
     return list(years)
 
 
-# ---------- 前端 ----------
+# ---------- Frontend ----------
 
-# 挂在最后：FastAPI 按注册顺序匹配路由，先注册的 /api/* 优先，
-# 剩下的路径才交给静态文件。html=True 让 "/" 自动返回 index.html。
+# Mounted last: FastAPI matches routes in registration order, so the
+# /api/* routes registered above take priority, and everything else falls
+# through to the static files. html=True makes "/" return index.html
+# automatically.
 FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 if FRONTEND_DIR.is_dir():
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

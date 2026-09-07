@@ -1,26 +1,36 @@
-"""往数据库里灌几家公司的财报数据，用于功能演示。
+"""Loads a few companies' financial statement data into the database for
+demo purposes.
 
-数据来源：各公司 10-K 年报（SEC EDGAR, sec.gov/edgar），
-取 "Consolidated Statements of Operations" 和 "Consolidated Balance Sheets"。
+Data source: each company's 10-K filings (SEC EDGAR, sec.gov/edgar), taken
+from "Consolidated Statements of Operations" and "Consolidated Balance
+Sheets".
 
-⚠️ 这批数字尚未逐项复核，仅用于演示图表和计算逻辑，不要直接拿去做投资分析。
+Warning: these figures have not been verified line-by-line. They are only
+meant to demonstrate the charts and calculation logic — do not use them for
+actual investment analysis.
 
-单位：百万美元。
-各公司财年结束日期不同：苹果 9 月底，微软 6 月底，沃尔玛 1 月底。
-所以同一个 fiscal_year 覆盖的时间段并不完全重合，横向比较时心里要有数。
+Units: millions of USD.
+Fiscal year-end dates differ by company: Apple ends in late September,
+Microsoft in late June, Walmart in late January. So the same fiscal_year
+value doesn't cover exactly the same calendar period across companies —
+worth keeping in mind for cross-company comparisons.
 
-选这三家是有意的对照组：
-  微软   —— 软件，毛利率极高，现金厚
-  苹果   —— 硬件，毛利率中等，但股东权益被巨额回购压得很低，ROE 高得吓人
-  沃尔玛 —— 零售，毛利率低、存货重、流动比率常年小于 1
-三种完全不同的商业模式，画在同一张图上对比才有意思。
+These three companies were chosen as a deliberate contrast set:
+  Microsoft — software, very high gross margin, cash-rich
+  Apple     — hardware, moderate gross margin, but equity is compressed by
+              years of large buybacks, making ROE look extremely high
+  Walmart   — retail, low gross margin, inventory-heavy, current ratio
+              regularly below 1
+Three very different business models, more interesting side by side on
+the same chart.
 """
 
 from app.database import Base, SessionLocal, engine
 from app.models import Company, FinancialStatement
 
-# 字段顺序：营收, 销货成本, 营业利润, 净利润,
-#           总资产, 总负债, 股东权益, 流动资产, 流动负债, 存货
+# Field order: revenue, cost of goods sold, operating income, net income,
+#              total assets, total liabilities, total equity,
+#              current assets, current liabilities, inventory
 FIELDS = [
     "revenue",
     "cost_of_goods_sold",
@@ -38,7 +48,7 @@ DATA = [
     {
         "name": "Apple",
         "ticker": "AAPL",
-        "industry": "消费电子",
+        "industry": "Consumer Electronics",
         "years": {
             2024: [391035, 210352, 123216, 93736, 364980, 308030, 56950, 152987, 176392, 7286],
             2023: [383285, 214137, 114301, 96995, 352583, 290437, 62146, 143566, 145308, 6331],
@@ -50,7 +60,7 @@ DATA = [
     {
         "name": "Microsoft",
         "ticker": "MSFT",
-        "industry": "软件",
+        "industry": "Software",
         "years": {
             2024: [245122, 74114, 109433, 88136, 512163, 243686, 268477, 159734, 125286, 1246],
             2023: [211915, 65863, 88523, 72361, 411976, 205753, 206223, 184257, 104149, 2500],
@@ -62,7 +72,7 @@ DATA = [
     {
         "name": "Walmart",
         "ticker": "WMT",
-        "industry": "零售",
+        "industry": "Retail",
         "years": {
             2024: [648125, 490142, 27012, 15511, 252399, 168455, 83944, 76877, 92415, 54892],
             2023: [611289, 463721, 20428, 11680, 243197, 160502, 82695, 75655, 92198, 56576],
@@ -73,7 +83,8 @@ DATA = [
 
 
 def main():
-    # 先清空重建，让这个脚本可以反复运行而不会撞上唯一约束
+    # Drop and rebuild first, so this script can be run repeatedly without
+    # hitting the unique constraint
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
@@ -86,7 +97,7 @@ def main():
                 industry=entry["industry"],
             )
             db.add(company)
-            db.flush()  # flush 让数据库分配 id，但还不提交，这样下面能拿到 company.id
+            db.flush()  # flush assigns an id without committing, so company.id is available below
 
             for year, values in entry["years"].items():
                 db.add(
@@ -96,10 +107,10 @@ def main():
                         **dict(zip(FIELDS, values)),
                     )
                 )
-            print(f"  {entry['name']:<12} {len(entry['years'])} 年")
+            print(f"  {entry['name']:<12} {len(entry['years'])} years")
 
         db.commit()
-        print("\n数据已写入 backend/financials.db")
+        print("\nData written to backend/financials.db")
     finally:
         db.close()
 

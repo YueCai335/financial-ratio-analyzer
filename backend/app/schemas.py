@@ -1,10 +1,11 @@
-"""Pydantic 模型：定义 API 的输入长什么样、输出长什么样。
+"""Pydantic models: define what the API's input and output look like.
 
-和 models.py 的区别常让人困惑：
-  models.py  = 数据库里怎么存（SQLAlchemy）
-  schemas.py = 网络上怎么传（Pydantic）
-分开的好处是数据库多存的字段不会不小心暴露给前端，
-前端传来的垃圾数据也会在进数据库之前被 Pydantic 挡下来。
+The distinction from models.py trips people up:
+  models.py  = how data is stored in the database (SQLAlchemy)
+  schemas.py = how data is transmitted over the network (Pydantic)
+Keeping them separate means extra fields stored in the database are never
+accidentally exposed to the frontend, and garbage data sent by the frontend
+is rejected by Pydantic before it ever reaches the database.
 """
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,7 +18,8 @@ class CompanyCreate(BaseModel):
 
 
 class CompanyOut(BaseModel):
-    # 允许直接从 SQLAlchemy 对象读属性来构造，不用手动一个个字段抄
+    # Allows building this directly from a SQLAlchemy object's attributes,
+    # instead of copying each field by hand
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -27,7 +29,8 @@ class CompanyOut(BaseModel):
 
 
 class StatementCreate(BaseModel):
-    # ge/le 是 Pydantic 的校验：财年必须在这个区间内，防止手滑输成 202 或 20233
+    # ge/le are Pydantic validators: the fiscal year must fall in this range,
+    # guarding against a typo like 202 or 20233
     fiscal_year: int = Field(ge=1900, le=2100)
 
     revenue: float | None = None
@@ -58,7 +61,7 @@ class RatioWarning(BaseModel):
 
 
 class YearRatios(BaseModel):
-    """某公司某一年的比率结果。"""
+    """Ratio results for one company in one year."""
 
     fiscal_year: int
     ratios: dict[str, float | None]
@@ -66,14 +69,16 @@ class YearRatios(BaseModel):
 
 
 class CompanyRatios(BaseModel):
-    """某公司所有年份的比率，按年份升序 —— 前端拿到直接就能画折线。"""
+    """All years of ratios for one company, ascending by year — the frontend
+    can plot this straight into a line chart.
+    """
 
     company: CompanyOut
     years: list[YearRatios]
 
 
 class ComparisonRow(BaseModel):
-    """横向对比：同一年，一家公司的一行。"""
+    """Side-by-side comparison: one company's row for a given year."""
 
     company: CompanyOut
     fiscal_year: int
