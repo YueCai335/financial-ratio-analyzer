@@ -31,7 +31,7 @@ def _divide(numerator: float | None, denominator: float | None) -> float | None:
 # ---------- Profitability ----------
 
 
-def gross_margin(revenue, cost_of_goods_sold):
+def gross_margin(revenue: float | None, cost_of_goods_sold: float | None) -> float | None:
     """Gross margin = (revenue - cost of goods sold) / revenue.
     How much of each dollar of revenue is left after direct costs.
     """
@@ -40,21 +40,21 @@ def gross_margin(revenue, cost_of_goods_sold):
     return _divide(revenue - cost_of_goods_sold, revenue)
 
 
-def net_margin(revenue, net_income):
+def net_margin(revenue: float | None, net_income: float | None) -> float | None:
     """Net margin = net income / revenue.
     How much of each dollar of revenue ultimately reaches shareholders.
     """
     return _divide(net_income, revenue)
 
 
-def roe(net_income, total_equity):
+def roe(net_income: float | None, total_equity: float | None) -> float | None:
     """ROE = net income / total equity.
     Return earned per dollar shareholders have invested.
     """
     return _divide(net_income, total_equity)
 
 
-def roa(net_income, total_assets):
+def roa(net_income: float | None, total_assets: float | None) -> float | None:
     """ROA = net income / total assets.
     Return earned per dollar of assets, regardless of how they were financed.
 
@@ -68,7 +68,7 @@ def roa(net_income, total_assets):
 # ---------- Liquidity ----------
 
 
-def current_ratio(current_assets, current_liabilities):
+def current_ratio(current_assets: float | None, current_liabilities: float | None) -> float | None:
     """Current ratio = current assets / current liabilities.
     How much liquidatable-within-a-year asset backs each dollar of debt due
     within a year.
@@ -76,7 +76,9 @@ def current_ratio(current_assets, current_liabilities):
     return _divide(current_assets, current_liabilities)
 
 
-def quick_ratio(current_assets, inventory, current_liabilities):
+def quick_ratio(
+    current_assets: float | None, inventory: float | None, current_liabilities: float | None
+) -> float | None:
     """Quick ratio = (current assets - inventory) / current liabilities.
 
     Why inventory is subtracted: inventory is the hardest current asset to
@@ -93,14 +95,14 @@ def quick_ratio(current_assets, inventory, current_liabilities):
 # ---------- Leverage / solvency ----------
 
 
-def debt_to_assets(total_liabilities, total_assets):
+def debt_to_assets(total_liabilities: float | None, total_assets: float | None) -> float | None:
     """Debt-to-assets = total liabilities / total assets.
     What fraction of the company's assets are funded by debt.
     """
     return _divide(total_liabilities, total_assets)
 
 
-def equity_multiplier(total_assets, total_equity):
+def equity_multiplier(total_assets: float | None, total_equity: float | None) -> float | None:
     """Equity multiplier = total assets / total equity.
     How many dollars of assets each dollar of equity supports — the leverage
     multiple.
